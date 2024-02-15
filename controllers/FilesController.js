@@ -66,7 +66,10 @@ class FilesController {
     const token = req.header('X-Token');
     const userId = await redisClient.get(`auth_${token}`);
     if (!userId) return res.status(401).send({ error: 'Unauthorized' });
-    const file = await dbClient.files.findOne({ _id: ObjectId(req.params.id), userId: ObjectId(userId) });
+    const file = await dbClient.files.findOne({
+      _id: ObjectId(req.params.id),
+      userId: ObjectId(userId),
+    });
     if (!file) return res.status(404).send({ error: 'Not found' });
     return res.send({
       id: file._id,
@@ -82,13 +85,15 @@ class FilesController {
     const token = req.header('X-Token');
     const userId = await redisClient.get(`auth_${token}`);
     if (!userId) return res.status(401).send({ error: 'Unauthorized' });
+    const parentId = req.query.parentId ? ObjectId(req.query.parentId) : 0;
+    const page = req.query.page * 20 || 0;
     const folder = await dbClient.files.aggregate([
       {
         $match: {
-          parentId: req.query.parentId || 0,
+          parentId,
         },
       },
-      { $skip: req.query.page * 20 || 0 },
+      { $skip: page },
       { $limit: 20 },
     ]).toArray();
     const formatedResponse = [];
