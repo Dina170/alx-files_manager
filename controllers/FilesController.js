@@ -61,6 +61,49 @@ class FilesController {
       parentId: fileData.parentId,
     });
   }
+
+  static async getShow(req, res) {
+    const token = req.header('X-Token');
+    const userId = await redisClient.get(`auth_${token}`);
+    if (!userId) return res.status(401).send({ error: 'Unauthorized' });
+    const file = dbClient.files.findOne({ _id: ObjectId(req.params.id), userId });
+    if (!file) return res.status(404).send({ error: 'Not found' });
+    return res.send({
+      id: file._id,
+      userId: file.userId,
+      name: file.name,
+      type: file.type,
+      isPublic: file.isPublic,
+      parentId: file.parentId,
+    });
+  }
+
+  static async getIndex(req, res) {
+    const token = req.header('X-Token');
+    const userId = await redisClient.get(`auth_${token}`);
+    if (!userId) return res.status(401).send({ error: 'Unauthorized' });
+    const folder = await dbClient.files.aggregate([
+      {
+        $match: {
+          parentId: req.query.parentId || 0,
+        },
+      },
+      { $skip: req.query.page || 0 * 20 },
+      { $limit: 20 },
+    ]).toArray();
+    const formatedResponse = [];
+    folder.forEach((ele) => {
+      formatedResponse.push({
+        id: ele._id,
+        userId: ele.userId,
+        name: ele.name,
+        type: ele.type,
+        isPublic: ele.isPublic,
+        parentId: ele.parentId,
+      });
+    });
+    return res.send(formatedResponse);
+  }
 }
 
 module.exports = FilesController;
