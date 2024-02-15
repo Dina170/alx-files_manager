@@ -5,9 +5,11 @@ import redisClient from '../utils/redis';
 const ObjectId = require('mongodb').ObjectID;
 const fs = require('fs');
 const mime = require('mime-types');
+const Queue = require('bull');
 
 class FilesController {
   static async postUpload(req, res) {
+    const fileQueue = new Queue('image transcoding');
     const token = req.header('X-Token');
     const userId = await redisClient.get(`auth_${token}`);
     if (!userId) return res.status(401).send({ error: 'Unauthorized' });
@@ -53,6 +55,13 @@ class FilesController {
     const decodedData = Buffer.from(data, 'base64');
     fs.writeFileSync(filePath, decodedData);
     const createdFile = await dbClient.files.insertOne(fileData);
+
+    if (fileData.type === 'image') {
+      fileQueue.add({
+        userId: fileData.userId,
+        fileId: fileData._id,
+      });
+    }
     return res.status(201).send({
       id: createdFile.insertedId,
       userId: fileData.userId,
@@ -165,14 +174,19 @@ class FilesController {
     const token = req.header('X-Token');
     const userId = await redisClient.get(`auth_${token}`);
     const fileId = req.params.id;
+    const { size } = req.query;
     const file = await dbClient.files.findOne({
       _id: ObjectId(fileId),
     });
     if (!file || (!file.isPublic && (!userId || file.userId.toString() !== userId))) return res.status(404).send({ error: 'Not found' });
     if (file.type === 'folder') return res.status(400).send({ error: "A folder doesn't have content" });
     if (!fs.existsSync(file.localPath)) return res.status(404).send({ error: 'Not found' });
+    let path = file.localPath;
+    if (size) {
+      path += `_${size}`;
+    }
     res.setHeader('Content-Type', mime.contentType(file.name));
-    return res.send(fs.readFileSync(file.localPath));
+    return res.send(fs.readFileSync(path));
   }
 }
 
