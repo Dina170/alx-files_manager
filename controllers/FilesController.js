@@ -4,6 +4,7 @@ import redisClient from '../utils/redis';
 
 const ObjectId = require('mongodb').ObjectID;
 const fs = require('fs');
+const mime = require('mime-types');
 
 class FilesController {
   static async postUpload(req, res) {
@@ -158,6 +159,20 @@ class FilesController {
       isPublic: fileUpdated.isPublic,
       parentId: fileUpdated.parentId,
     });
+  }
+
+  static async getFile(req, res) {
+    const token = req.header('X-Token');
+    const userId = await redisClient.get(`auth_${token}`);
+    const fileId = req.params.id;
+    const file = await dbClient.files.findOne({
+      _id: ObjectId(fileId),
+    });
+    if (!file || (!file.isPublic && (!userId || file.userId.toString() !== userId))) return res.status(404).send({ error: 'Not found' });
+    if (file.type === 'folder') return res.status(400).send({ error: "A folder doesn't have content" });
+    if (!fs.existsSync(file.localPath)) return res.status(404).send({ error: 'Not found' });
+    res.setHeader('Content-Type', mime.contentType(file.name));
+    return res.send(fs.readFileSync(file.localPath));
   }
 }
 
