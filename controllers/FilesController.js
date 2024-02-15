@@ -96,7 +96,7 @@ class FilesController {
     const userId = await redisClient.get(`auth_${token}`);
     if (!userId) return res.status(401).send({ error: 'Unauthorized' });
     const parentId = req.query.parentId ? ObjectId(req.query.parentId) : 0;
-    const page = req.query.page * 20 || 0;
+    const page = req.query.page? req.query.page * 20 : 0;
     const folder = await dbClient.files.aggregate([
       {
         $match: {
