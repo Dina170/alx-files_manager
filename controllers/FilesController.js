@@ -66,7 +66,7 @@ class FilesController {
     const token = req.header('X-Token');
     const userId = await redisClient.get(`auth_${token}`);
     if (!userId) return res.status(401).send({ error: 'Unauthorized' });
-    const file = dbClient.files.findOne({ _id: ObjectId(req.params.id), userId });
+    const file = await dbClient.files.findOne({ _id: ObjectId(req.params.id), userId: ObjectId(userId) });
     if (!file) return res.status(404).send({ error: 'Not found' });
     return res.send({
       id: file._id,
@@ -88,7 +88,7 @@ class FilesController {
           parentId: req.query.parentId || 0,
         },
       },
-      { $skip: req.query.page || 0 * 20 },
+      { $skip: req.query.page * 20 || 0 },
       { $limit: 20 },
     ]).toArray();
     const formatedResponse = [];
